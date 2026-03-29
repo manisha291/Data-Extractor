@@ -112,6 +112,7 @@ with tab2:
 if content:
     st.markdown("---")
     with st.status("🤖 AI is extracting tender fields...", expanded=True) as status:
+        st.write("Sending to Gemini AI... (may take up to 60s if rate-limited, please wait)")
         api_key = st.secrets["GEMINI_API_KEY"]
         data, error = extract_tender_data(content, api_key, source_url)
 
