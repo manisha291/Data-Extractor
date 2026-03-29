@@ -1,0 +1,8 @@
+# Never upload secrets to GitHub
+.streamlit/secrets.toml
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.env
