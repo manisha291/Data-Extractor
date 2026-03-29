@@ -9,7 +9,7 @@ def extract_tender_data(content: str, api_key: str, source_url: str = ""):
     """
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.0-flash")
 
         prompt = f"""You are a data extraction specialist for commercial tenders and government projects.
 
