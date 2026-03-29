@@ -3,10 +3,10 @@ import json
 import time
 
 # Models to try in order — if one is rate-limited, falls back to next
+# Using stable, free-tier compatible models
 MODELS = [
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash",      # Most reliable for free tier
+    "gemini-pro",             # Fallback option
 ]
 
 PROMPT_TEMPLATE = """You are a data extraction specialist for commercial tenders and government projects.
@@ -50,6 +50,9 @@ def extract_tender_data(content: str, api_key: str, source_url: str = ""):
     for model_name in MODELS:
         for attempt in range(3):  # up to 3 retries per model
             try:
+                # Add delay between requests to avoid rate limiting
+                time.sleep(2)
+                
                 model = genai.GenerativeModel(model_name)
                 response = model.generate_content(prompt)
                 raw = response.text.strip()
@@ -70,7 +73,8 @@ def extract_tender_data(content: str, api_key: str, source_url: str = ""):
                     "quota" in error_msg.lower() or
                     "rate" in error_msg.lower() or
                     "429" in error_msg or
-                    "resource_exhausted" in error_msg.lower()
+                    "resource_exhausted" in error_msg.lower() or
+                    "404" in error_msg  # Handle 404 model not found errors
                 )
 
                 if is_quota:
