@@ -1,17 +1,15 @@
 import google.generativeai as genai
 import json
+import time
 
+# Models to try in order — if one is rate-limited, falls back to next
+MODELS = [
+    "gemini-2.0-flash",
+    "gemini-2.0-flash-lite",
+    "gemini-1.5-flash-latest",
+]
 
-def extract_tender_data(content: str, api_key: str, source_url: str = ""):
-    """
-    Uses Google Gemini AI to extract structured tender data from raw webpage text.
-    Returns (data_dict, error_message).
-    """
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
-
-        prompt = f"""You are a data extraction specialist for commercial tenders and government projects.
+PROMPT_TEMPLATE = """You are a data extraction specialist for commercial tenders and government projects.
 
 Analyze the webpage content below and extract all relevant tender/project information.
 
@@ -38,21 +36,55 @@ Rules:
 Webpage content:
 {content}"""
 
-        response = model.generate_content(prompt)
-        raw = response.text.strip()
 
-        # Strip markdown fences if model added them
-        raw = raw.replace("```json", "").replace("```", "").strip()
+def extract_tender_data(content: str, api_key: str, source_url: str = ""):
+    """
+    Uses Google Gemini AI to extract structured tender data from raw webpage text.
+    Retries up to 3 times with delays, and falls back across multiple models.
+    Returns (data_dict, error_message).
+    """
+    genai.configure(api_key=api_key)
+    prompt = PROMPT_TEMPLATE.format(source_url=source_url, content=content)
+    last_error = "Unknown error"
 
-        data = json.loads(raw)
-        return data, None
+    for model_name in MODELS:
+        for attempt in range(3):  # up to 3 retries per model
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                raw = response.text.strip()
+                raw = raw.replace("```json", "").replace("```", "").strip()
+                data = json.loads(raw)
+                return data, None
 
-    except json.JSONDecodeError as e:
-        return None, f"AI returned invalid JSON: {str(e)}"
-    except Exception as e:
-        error_msg = str(e)
-        if "API_KEY_INVALID" in error_msg or "API key not valid" in error_msg:
-            return None, "Invalid API key. Please check your Gemini API key."
-        if "quota" in error_msg.lower():
-            return None, "Free quota exceeded. Please wait and try again later."
-        return None, error_msg
+            except json.JSONDecodeError as e:
+                return None, f"AI returned invalid JSON: {str(e)}"
+
+            except Exception as e:
+                error_msg = str(e)
+
+                if "API_KEY_INVALID" in error_msg or "API key not valid" in error_msg:
+                    return None, "Invalid API key. Please check your Gemini API key in Streamlit Secrets."
+
+                is_quota = (
+                    "quota" in error_msg.lower() or
+                    "rate" in error_msg.lower() or
+                    "429" in error_msg or
+                    "resource_exhausted" in error_msg.lower()
+                )
+
+                if is_quota:
+                    last_error = error_msg
+                    wait = (attempt + 1) * 15  # 15s, 30s, 45s
+                    time.sleep(wait)
+                    continue  # retry same model
+
+                # Non-quota error — try next model immediately
+                last_error = error_msg
+                break
+
+    return None, (
+        "All Gemini models are currently rate-limited on the free tier. "
+        "Please wait 1-2 minutes and try again. "
+        f"Last error: {last_error}"
+    )
