@@ -3,10 +3,10 @@ import json
 import time
 
 # Models to try in order — if one is rate-limited, falls back to next
+# Updated to use free-tier compatible models that don't return 404 errors
 MODELS = [
-    "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-1.5-flash-latest",
+    "gemini-pro",
+    "gemini-1.0-pro-latest",
 ]
 
 PROMPT_TEMPLATE = """You are a data extraction specialist for commercial tenders and government projects.
@@ -35,7 +35,6 @@ Rules:
 
 Webpage content:
 {content}"""
-
 
 def extract_tender_data(content: str, api_key: str, source_url: str = ""):
     """
@@ -70,12 +69,13 @@ def extract_tender_data(content: str, api_key: str, source_url: str = ""):
                     "quota" in error_msg.lower() or
                     "rate" in error_msg.lower() or
                     "429" in error_msg or
-                    "resource_exhausted" in error_msg.lower()
+                    "resource_exhausted" in error_msg.lower() or
+                    "404" in error_msg
                 )
 
                 if is_quota:
                     last_error = error_msg
-                    wait = (attempt + 1) * 15  # 15s, 30s, 45s
+                    wait = (attempt + 1) * 30  # 30s, 60s, 90s — longer waits for free tier
                     time.sleep(wait)
                     continue  # retry same model
 
@@ -85,6 +85,6 @@ def extract_tender_data(content: str, api_key: str, source_url: str = ""):
 
     return None, (
         "All Gemini models are currently rate-limited on the free tier. "
-        "Please wait 1-2 minutes and try again. "
+        "Please wait 2-5 minutes and try again. "
         f"Last error: {last_error}"
     )
