@@ -10,7 +10,7 @@ st.set_page_config(
     layout="centered"
 )
 
-st.title("🏗️ Tender & Projects Data Extractor")
+st.title("Data Extractor")
 st.markdown("Paste a tender or commercial project URL and extract structured data instantly.")
 
 # Sidebar
